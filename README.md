@@ -1,32 +1,61 @@
 # NebulaShell
 
-NebulaShell is a browser-based Linux workspace with login, Docker-isolated terminal sessions, persistent `/workspace` files, terminal history replay, and a browser file editor.
+A browser-based Linux workspace for running isolated terminal sessions, editing files, and returning to saved work without leaving the browser.
 
-## Features
+NebulaShell combines a React workspace UI, Socket.IO terminal streaming, an Express control plane, and Docker-backed Linux sandboxes. Each signed-in user gets persistent files under `/workspace` and terminal history that can be replayed across sessions.
 
-- React + TypeScript + Tailwind UI
-- xterm.js terminal streamed over Socket.IO
-- Express backend with Docker and PTY management
-- One sandboxed Docker container per active terminal
-- Per-user persisted files and terminal history
-- Monaco file editor with upload/download support
-- Basic container CPU/memory monitoring
+## Highlights
 
-## Quick Start
+- Authenticated browser workspace
+- Docker-isolated Linux terminal sessions
+- xterm.js terminal streaming over Socket.IO
+- Monaco-powered file editing
+- Upload, download, create, save, and delete file operations
+- Per-user persisted workspace directories
+- Terminal history replay by user and terminal name
+- Basic CPU and memory visibility for active containers
 
-Requirements: Node.js 20+, npm 10+, and Docker running.
+## How It Works
 
-```bash
-npm install
-npm run docker:build
-npm run dev
+```text
+React client
+  -> REST + Socket.IO
+Express server
+  -> auth, file APIs, session manager, PTY bridge
+Docker host
+  -> one sandbox container per active terminal
+server/data
+  -> users, workspaces, and terminal history
 ```
 
-Open `http://localhost:5173/`. The API server runs on `http://localhost:3001/`.
+## Tech Stack
 
-## Create A User
+| Area | Tools |
+| --- | --- |
+| Client | React, TypeScript, Vite, Tailwind CSS |
+| Terminal | xterm.js, Socket.IO |
+| Editor | Monaco Editor |
+| Server | Node.js, Express, Socket.IO |
+| Sandbox | Docker, Ubuntu base image, PTY bridge |
+| Persistence | Local `server/data` directory |
+| Auth | bcrypt, httpOnly JWT cookie |
 
-The UI is login-only, so create the first local user through the API:
+## Commands
+
+```bash
+npm install          # Install workspace dependencies
+npm run docker:build # Build the sandbox image
+npm run dev          # Start client and server
+npm run typecheck    # Typecheck both workspaces
+npm run build        # Build server and client
+npm run start        # Start the built server
+```
+
+The client runs at `http://localhost:5173/` and the API server runs at `http://localhost:3001/`.
+
+## First Local User
+
+The landing page is login-only. Create a local user through the API before signing in:
 
 ```bash
 curl -X POST http://localhost:3001/api/auth/register \
@@ -34,30 +63,18 @@ curl -X POST http://localhost:3001/api/auth/register \
   -d '{"username":"demo","password":"secret123"}'
 ```
 
-Then sign in with `demo` / `secret123`.
-
-## Commands
-
-```bash
-npm run dev          # Start server and client
-npm run typecheck    # Typecheck both workspaces
-npm run build        # Build server and client
-npm run docker:build # Build the sandbox image
-npm run start        # Start the built server
-```
-
-## Project Layout
+## Project Structure
 
 ```text
-client/               React, Vite, xterm, Monaco
-server/               Express, Socket.IO, PTY, Docker, auth
-docker/base-image/    Ubuntu sandbox image
+client/               React app and browser workspace UI
+server/               Express API, auth, sessions, PTY, Docker control
+docker/base-image/    Ubuntu image used for terminal containers
 docs/                 API, architecture, and security notes
 ```
 
-## Persistence
+## Persistent Data
 
-Runtime data is stored under `server/data` and ignored by git:
+Local runtime data is written to `server/data` and ignored by git.
 
 ```text
 server/data/users.json
@@ -65,19 +82,30 @@ server/data/workspaces/<userId>/
 server/data/history/<userId>/<terminalName>.log
 ```
 
-## Environment
+## Sandbox Image
 
-Copy `.env.example` to `.env` if you need custom ports, Docker limits, auth settings, or persistence paths.
+The base image includes Ubuntu, Bash, Git, Node.js, npm, Python 3, pip, C/C++ build tools, ripgrep, nano, less, and vim.
 
-Important production settings:
+Example commands inside a NebulaShell terminal:
 
-- Set a strong `JWT_SECRET`.
+```bash
+python3 app.py
+g++ -std=c++20 main.cpp -o main && ./main
+npm install
+git status
+```
+
+## Configuration
+
+Use `.env.example` as the reference for ports, Docker limits, auth settings, and persistence paths.
+
+Important production changes:
+
+- Replace the development `JWT_SECRET`.
 - Serve over HTTPS.
-- Set `AUTH_COOKIE_SECURE=true` behind HTTPS.
-- Add rate limits and user quotas before public deployment.
+- Set `AUTH_COOKIE_SECURE=true`.
+- Add rate limits, quotas, backups, and operational monitoring before public deployment.
 
-## Scaling
+## Status
 
-NebulaShell is ready for local use and small single-host deployments. It is not horizontally scalable yet because active PTYs, Docker containers, sessions, and workspace files are tied to one server.
-
-For SaaS-scale deployment, move users/session metadata to Postgres or Supabase, add Redis for Socket.IO coordination, use shared workspace storage, and run containers through worker nodes or an orchestrator.
+NebulaShell is currently designed for local use and small single-host deployments. Active PTYs, Docker containers, sessions, and workspace files are tied to the server that runs them.
